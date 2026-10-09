@@ -183,6 +183,7 @@ try
         return Summary();
 
     // 4c. Rename (update)
+    string currentName = TestName;
     var update = await api.PostAsync($"smartlock/{target.Id}/auth/{createdId}", new { name = RenamedTestName });
     Record("4c. Update", update);
     if (update.Ok)
@@ -190,6 +191,15 @@ try
         Console.WriteLine("  Waiting for the rename to appear...");
         bool renamed = await PollForEntry(e => Str(e, "id") == createdId && Str(e, "name") == RenamedTestName) != null;
         results.Add(("4d. Update confirmed", renamed ? "PASS" : "FAIL", renamed ? "" : $"Not visible after {pollTimeout.TotalSeconds:0}s"));
+        if (renamed) currentName = RenamedTestName;
+    }
+
+    // Pause so the entry can be inspected in Nuki Web before it is removed
+    Console.WriteLine($"\n  Keypad code '{currentName}' (PIN {pin}) is on '{target.Name}' now; you can check it in Nuki Web.");
+    if (!Confirm("  Delete it now?"))
+    {
+        results.Add(("4e. Delete", "SKIP", "Kept at prompt; the next run offers to delete it"));
+        return Summary();
     }
 
     // 4e. Delete

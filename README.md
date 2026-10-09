@@ -9,7 +9,7 @@ Console tool that checks what the Nuki Web API lets this account do. It is separ
 | 3. Read entries | `GET /smartlock/{id}/auth` | No (PINs are not printed) |
 | 4. Write test | `PUT`, `POST`, `DELETE /smartlock/{id}/auth` | Yes, after a `y/N` prompt |
 
-The write test creates a keypad code named `API-TEST` that is valid for only one day a year from now, so it can't open the door. It renames that code, deletes it, and reads the lock back after each step to confirm the change. If an earlier run left a test entry behind, the probe offers to delete it at the start of step 4.
+The write test creates a keypad code named `API-TEST` that is valid for only one day a year from now, so it can't open the door. It renames that code, then pauses and asks before deleting it so you can look at the entry in Nuki Web. The lock is read back after each step to confirm the change. If an earlier run left a test entry behind, the probe offers to delete it at the start of step 4.
 
 ## Setup
 
