@@ -161,15 +161,13 @@ bool deleted = false;
 try
 {
     // 4a. Create
-    var create = await api.PutAsync($"smartlock/{target.Id}/auth", new
+    var create = await api.PutAsync($"smartlock/{target.Id}/auth", WithTimeWindow(new()
     {
-        name = TestName,
-        type = 13,
-        code = pin,
-        remoteAllowed = false,
-        allowedFromDate = Iso(from),
-        allowedUntilDate = Iso(until)
-    });
+        ["name"] = TestName,
+        ["type"] = 13,
+        ["code"] = pin,
+        ["remoteAllowed"] = false
+    }));
     Record("4a. Create", create);
     if (!create.Ok)
         return Summary();
@@ -182,21 +180,38 @@ try
     if (createdId == null)
         return Summary();
 
-    // 4c. Rename (update)
+    // Without a stored date window the PIN opens the door right now, so skip the rename and go to delete
+    bool windowOk = await CheckTimeWindow(createdId, "4b2. Date limit applied");
+
+    // 4c. Rename (update) - resends the window, because an update without it clears it
     string currentName = TestName;
-    var update = await api.PostAsync($"smartlock/{target.Id}/auth/{createdId}", new { name = RenamedTestName });
-    Record("4c. Update", update);
-    if (update.Ok)
+    if (windowOk)
     {
-        Console.WriteLine("  Waiting for the rename to appear...");
-        bool renamed = await PollForEntry(e => Str(e, "id") == createdId && Str(e, "name") == RenamedTestName) != null;
-        results.Add(("4d. Update confirmed", renamed ? "PASS" : "FAIL", renamed ? "" : $"Not visible after {pollTimeout.TotalSeconds:0}s"));
-        if (renamed) currentName = RenamedTestName;
+        var update = await api.PostAsync($"smartlock/{target.Id}/auth/{createdId}",
+            WithTimeWindow(new() { ["name"] = RenamedTestName }));
+        Record("4c. Update", update);
+        if (update.Ok)
+        {
+            Console.WriteLine("  Waiting for the rename to appear...");
+            bool renamed = await PollForEntry(e => Str(e, "id") == createdId && Str(e, "name") == RenamedTestName) != null;
+            results.Add(("4d. Update confirmed", renamed ? "PASS" : "FAIL", renamed ? "" : $"Not visible after {pollTimeout.TotalSeconds:0}s"));
+            if (renamed)
+            {
+                currentName = RenamedTestName;
+                windowOk = await CheckTimeWindow(createdId, "4d2. Date limit kept");
+            }
+        }
     }
 
     // Pause so the entry can be inspected in Nuki Web before it is removed
     Console.WriteLine($"\n  Keypad code '{currentName}' (PIN {pin}) is on '{target.Name}' now; you can check it in Nuki Web.");
-    if (!Confirm("  Delete it now?"))
+    if (!windowOk)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine("  WARNING: no date limit is stored, so this PIN can open the door NOW. Deleting is the default.");
+        Console.ResetColor();
+    }
+    if (!Confirm("  Delete it now?", defaultYes: !windowOk))
     {
         results.Add(("4e. Delete", "SKIP", "Kept at prompt; the next run offers to delete it"));
         return Summary();
@@ -226,6 +241,36 @@ finally
 return Summary();
 
 // ================================================================ helpers
+
+// Nuki only enforces the date window when allowedWeekDays is sent with it (127 = every day)
+Dictionary<string, object> WithTimeWindow(Dictionary<string, object> body)
+{
+    body["allowedFromDate"] = Iso(from);
+    body["allowedUntilDate"] = Iso(until);
+    body["allowedWeekDays"] = 127;
+    return body;
+}
+
+// Reads the entry back and reports whether Nuki actually stored the date limit
+async Task<bool> CheckTimeWindow(string id, string step)
+{
+    var r = await api.GetAsync($"smartlock/{target.Id}/auth?types=13");
+    if (!r.Ok)
+    {
+        Record(step, r);
+        return false;
+    }
+    using var doc = JsonDocument.Parse(r.Body);
+    var entry = doc.RootElement.EnumerateArray().FirstOrDefault(e => Str(e, "id") == id);
+    string? storedFrom = entry.ValueKind == JsonValueKind.Object ? Str(entry, "allowedFromDate") : null;
+    string? storedUntil = entry.ValueKind == JsonValueKind.Object ? Str(entry, "allowedUntilDate") : null;
+    int? storedDays = entry.ValueKind == JsonValueKind.Object ? Int(entry, "allowedWeekDays") : null;
+    Console.WriteLine($"  Stored limit: from={storedFrom ?? "-"}  until={storedUntil ?? "-"}  weekDays={storedDays?.ToString() ?? "-"}");
+
+    bool ok = storedFrom != null && storedUntil != null;
+    results.Add((step, ok ? "PASS" : "FAIL", ok ? "" : "No date limit stored - the PIN is usable now"));
+    return ok;
+}
 
 async Task<string?> PollForEntry(Func<JsonElement, bool> match)
 {
@@ -312,10 +357,11 @@ static void Fail(string text)
     Console.ResetColor();
 }
 
-static bool Confirm(string question)
+static bool Confirm(string question, bool defaultYes = false)
 {
-    Console.Write($"{question} [y/N]: ");
-    return Console.ReadLine()?.Trim().Equals("y", StringComparison.OrdinalIgnoreCase) == true;
+    Console.Write($"{question} {(defaultYes ? "[Y/n]" : "[y/N]")}: ");
+    string answer = Console.ReadLine()?.Trim() ?? "";
+    return answer == "" ? defaultYes : answer.Equals("y", StringComparison.OrdinalIgnoreCase);
 }
 
 static string Status(ApiResult r) => r.Status == 0 ? "no response" : $"HTTP {r.Status}{(r.Ok ? " OK" : "")}";
