@@ -143,13 +143,17 @@ foreach (var (id, name) in leftovers)
     Console.WriteLine($"    DELETE -> {Status(del)}");
 }
 
-// Valid only for one day a year from now, so the code cannot open the door during the test
-DateTime from = DateTime.UtcNow.Date.AddYears(1);
-DateTime until = from.AddDays(1);
+// Valid only for one day a year from now, so the code cannot open the door during the test.
+// Dates are midnight at the lock (Panama, UTC-5, no daylight saving), which is how Nuki Web displays them.
+var lockZone = TimeZoneInfo.FindSystemTimeZoneById("SA Pacific Standard Time");
+DateTime fromLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, lockZone).Date.AddYears(1);
+DateTime untilLocal = fromLocal.AddDays(1);
+DateTime from = TimeZoneInfo.ConvertTimeToUtc(fromLocal, lockZone);
+DateTime until = TimeZoneInfo.ConvertTimeToUtc(untilLocal, lockZone);
 int pin = GeneratePin(existingCodes);
 
 Console.WriteLine($"  This will create keypad code '{TestName}' on '{target.Name}' with PIN {pin},");
-Console.WriteLine($"  valid only {from:yyyy-MM-dd} to {until:yyyy-MM-dd} (UTC), then rename it and delete it.");
+Console.WriteLine($"  valid only {fromLocal:yyyy-MM-dd} to {untilLocal:yyyy-MM-dd} (Panama time), then rename it and delete it.");
 if (!Confirm("  Proceed?"))
 {
     results.Add(("4. Write test", "SKIP", "Declined at prompt"));
