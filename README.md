@@ -29,8 +29,12 @@ dotnet run -- --read-only        # steps 1-3 only
 dotnet run -- --lock <id>        # pick the lock when the account has several
 ```
 
-The exit code is 0 if every step passed and 1 if any step failed.
+The exit code is 0 if every step passed, 1 if any step failed, and 2 if no API token was found.
 
 Status codes that answer the question:
 - **402** (account not paid) or **426** (account upgrade required) on create: Nuki still restricts this for your account.
 - **403**: the token is missing a permission.
+
+## License
+
+[MIT](LICENSE)
