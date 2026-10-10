@@ -1,6 +1,6 @@
 # NukiApiProbe
 
-Console tool that checks what the Nuki Web API lets this account do. It is separate from AirBnBWorkflow and shares no code or settings with it.
+Console tool that checks what the Nuki Web API lets this account do. 
 
 | Step | Call | Changes the lock? |
 |---|---|---|
