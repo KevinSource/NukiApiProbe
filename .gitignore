@@ -3,6 +3,42 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
+# =====================================================================
+# Personal and machine-specific files - never publish these.
+# This repository is public. A .gitignore only keeps whole files out;
+# never type real paths, names, tokens or addresses into source files.
+# The API token lives in .NET user-secrets (%APPDATA%), never here.
+# =====================================================================
+
+# Exports and reports may list keypad codes
+*.xlsx
+*.xls
+*.csv
+
+# Windows shortcuts store absolute paths from this PC
+*.lnk
+
+# Windows / Google Drive folder metadata
+desktop.ini
+Thumbs.db
+
+# Secrets and local configuration
+.env
+.env.*
+secrets.json
+*.secrets.json
+appsettings.*.json
+*.pfx
+*.p12
+*.pem
+*.key
+*.snk
+*.log
+
+# =====================================================================
+# Standard Visual Studio rules below
+# =====================================================================
+
 # dotenv files
 .env
 
